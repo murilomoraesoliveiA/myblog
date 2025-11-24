@@ -1,0 +1,177 @@
+---
+title: "Cotação do dolar"
+author: "Murilo Moraes"
+date: "2025-11-24"
+categories: [programation, queronota10]
+image: "price-tag-geometric-shape-vector-Memphis-style-Geometry-drawing-Geometric_502612_wh1200.png"
+jupyter: "python3"
+---
+
+neste exercicio está como desenvolver um codigo em python que consulta a variação do dolar,a explicação está ao logno do codigo nos comentários dele.
+
+```{python}
+import calendar  # Biblioteca usada para lidar com dados de calendário, como descobrir o último dia do mês
+from datetime import datetime, timedelta  # datetime manipula datas; timedelta permite somar/subtrair dias
+import requests  # Usado para fazer requisições HTTP (acessar APIs externas)
+import plotly.express as px  # Biblioteca para criar gráficos interativos
+import pandas as pd  # Usada para trabalhar com tabelas e DataFrames
+
+def consultar_cotacao(mes_ano):
+    """
+    mes_ano: string no formato MMYYYY, como '022007'
+    A função consulta todas as cotações do dólar daquele mês no Banco Central
+    Preenche fins de semana e feriados usando a última cotação útil
+    Gera um gráfico e devolve os dados em forma de dicionário
+    """
+
+    # --------------------------------------------------------------------------------------
+    # 1. CRIA A DATA INICIAL E FINAL DO MÊS
+    # --------------------------------------------------------------------------------------
+
+    # Converte a string no formato "MMYYYY" para um objeto datetime representando o primeiro dia do mês
+    inicio_mes = datetime.strptime(mes_ano, "%m%Y")
+
+    # Descobre automaticamente quantos dias aquele mês tem e cria a data do último dia do mês
+    fim_mes = inicio_mes.replace(day=calendar.monthrange(inicio_mes.year, inicio_mes.month)[1])
+    # Exemplo: fevereiro de 2007 → último dia é 28 (ou 29 em ano bissexto)
+
+    # Formata as datas para o padrão exigido pela API do Banco Central (MM-DD-YYYY)
+    data_ini = inicio_mes.strftime("%m-%d-%Y")
+    data_fin = fim_mes.strftime("%m-%d-%Y")
+
+    # --------------------------------------------------------------------------------------
+    # 2. MONTA A URL DA API DO BANCO CENTRAL (PTAX)
+    # --------------------------------------------------------------------------------------
+
+    # A API PTAX exige que passemos o intervalo de datas, então construímos a URL completa com string formatada
+    endpoint = (
+        "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+        "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?"
+        f"@dataInicial='{data_ini}'&@dataFinalCotacao='{data_fin}'&$format=json"
+    )
+
+    # Faz a requisição HTTP GET para a API e converte a resposta para JSON
+    resposta = requests.get(endpoint).json()
+
+    # --------------------------------------------------------------------------------------
+    # 3. ORGANIZA OS DADOS RECEBIDOS EM UM DICIONÁRIO POR DIA
+    # --------------------------------------------------------------------------------------
+
+    tabela_cotacoes = {}  
+    # Estrutura que teremos:
+    # { data: (valor_compra, valor_venda) }
+
+    for registro in resposta["value"]:
+        # Cada registro tem data e valores da cotação
+
+        # Converte a string de data e hora da API para objeto datetime, depois extrai apenas a data (YYYY-MM-DD)
+        data_registro = datetime.strptime(registro["dataHoraCotacao"], "%Y-%m-%d %H:%M:%S.%f").date()
+
+        # Valor da cotação no momento registrado
+        valor_compra = registro["cotacaoCompra"]
+        valor_venda = registro["cotacaoVenda"]
+
+        # Armazena no dicionário usando a data como chave
+        tabela_cotacoes[data_registro] = (valor_compra, valor_venda)
+
+    # --------------------------------------------------------------------------------------
+    # 4. FUNÇÃO INTERNA PARA ACHAR O ÚLTIMO DIA ÚTIL
+    # --------------------------------------------------------------------------------------
+
+    def buscar_ultimo_util(dia_busca):
+        """
+        Usa o dia atual e volta para trás até encontrar um dia com cotação disponível.
+        Isso é necessário porque em fins de semana e feriados a bolsa não funciona.
+        """
+
+        # Começa voltando 1 dia antes do dia pesquisado
+        dia_busca -= timedelta(days=1)
+
+        # Continua voltando enquanto ainda está no mês consultado
+        while dia_busca >= inicio_mes.date():
+
+            # Se esse dia estiver no dicionário, significa que teve cotação
+            if dia_busca in tabela_cotacoes:
+                return tabela_cotacoes[dia_busca]
+
+            # Caso contrário continua voltando mais um dia
+            dia_busca -= timedelta(days=1)
+
+        # Caso não encontre nada (o que é extremamente raro), retorna valores vazios
+        return (None, None)
+
+    # --------------------------------------------------------------------------------------
+    # 5. MONTA A LISTA FINAL COM TODAS AS DATAS DO MÊS
+    # --------------------------------------------------------------------------------------
+
+    linhas_processadas = []  # Guarda cada linha com data, compra e venda
+    data_atual = inicio_mes.date()
+
+    # Loop para percorrer TODOS os dias do mês, incluindo finais de semana
+    while data_atual <= fim_mes.date():
+
+        # Se o dia tem cotação real, usamos ela
+        if data_atual in tabela_cotacoes:
+            compra, venda = tabela_cotacoes[data_atual]
+
+        else:
+            # Se não tem (feriado ou final de semana), pegamos a última cotação conhecida antes dessa
+            compra, venda = buscar_ultimo_util(data_atual)
+
+        # Adiciona o registro formatado à lista
+        linhas_processadas.append({
+            "Data": data_atual.strftime("%d/%m/%Y"),  # Data formatada para o gráfico
+            "Compra": compra,
+            "Venda": venda,
+        })
+
+        # Avança para o próximo dia
+        data_atual += timedelta(days=1)
+
+    # --------------------------------------------------------------------------------------
+    # 6. TRANSFORMA A LISTA EM UM DATAFRAME
+    # --------------------------------------------------------------------------------------
+
+    df = pd.DataFrame(linhas_processadas)
+    # Isso facilita gerar gráficos e trabalhar com os dados
+
+    # --------------------------------------------------------------------------------------
+    # 7. GERA O GRÁFICO COM O PLOTLY
+    # --------------------------------------------------------------------------------------
+
+    fig = px.line(
+        df,                   # Fonte de dados
+        x="Data",             # Eixo X → dia do mês
+        y=["Compra", "Venda"],# Eixo Y → duas linhas no mesmo gráfico
+        title=f"Cotação do Dólar de {inicio_mes.strftime('%d/%m/%Y')} a {fim_mes.strftime('%d/%m/%Y')}",
+        labels={
+            "value": "Valor (R$)", 
+            "variable": "Tipo de Cotação"  # Nome da legenda
+        },
+        color_discrete_map={  # Define as cores das duas linhas
+            "Compra": "green",
+            "Venda": "red"
+        }
+    )
+
+    # Usa um tema visual mais limpo
+    fig.update_layout(template="plotly_white")
+
+    # Exibe o gráfico
+    fig.show()
+
+    # --------------------------------------------------------------------------------------
+    # 8. RETORNA OS DADOS DE FORMA ORGANIZADA
+    # --------------------------------------------------------------------------------------
+
+    return {
+        "Período consultado": f"{inicio_mes.strftime('%d/%m/%Y')} até {fim_mes.strftime('%d/%m/%Y')}",
+        "Cotações": linhas_processadas
+    }
+
+# Chamada da função, apenas para exemplo
+print(consultar_cotacao("022007"))
+#escolhi esta data pois meu RA 228766 não está na tabela que o professor mandou, então coloquei uma de minha escolha
+
+
+```

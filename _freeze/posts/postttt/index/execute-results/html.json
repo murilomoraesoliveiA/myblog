@@ -1,0 +1,12 @@
+{
+  "hash": "601ac04097bc162aa7aea729fb180db0",
+  "result": {
+    "engine": "jupyter",
+    "markdown": "---\ntitle: \"gráfico X e Y\"\nauthor: \"Murilo Moraes\"\ndate: \"2025-11-24\"\ncategories: [programation, queronota10]\nimage: \"10993494.jpg\"\njupyter: python3\n---\n\nneste exercicio está como desenvolver um codigo em python que consulta um grafico com multiplos pontos x e y,a explicação está ao logno do codigo nos comentários dele.\n\n::: {#60853c1e .cell execution_count=1}\n``` {.python .cell-code}\nfrom plotnine import ggplot, aes, geom_point, geom_abline\nimport pandas as pd\nimport numpy as np\n\n# ---- Leitura dos arquivos ----\nwith open(\"X.txt\") as f:\n    valores_x = [float(line.strip()) for line in f]\n\nwith open(\"Y.txt\") as f:\n    valores_y = [float(line.strip()) for line in f]\n\ndf = pd.DataFrame({\"x\": valores_x, \"y\": valores_y})\n\n# ---- Regressão linear ----\nb, a = np.polyfit(df['x'], df['y'], 1)\n\n# ---- Geração do gráfico ----\nplot = (\n    ggplot(df, aes(\"x\", \"y\"))\n    + geom_point()\n    + geom_abline(intercept=a, slope=b)\n)\n\n# ---- Salvar corretamente ----\nplot.save(\"grafico.png\", dpi=300, width=6, height=4)\n\nprint(\"Gráfico gerado com sucesso! Arquivo salvo como grafico.png\")\n```\n\n::: {.cell-output .cell-output-stderr}\n```\n/home/codespace/.python/current/lib/python3.12/site-packages/plotnine/ggplot.py:623: PlotnineWarning: Saving 6 x 4 in image.\n/home/codespace/.python/current/lib/python3.12/site-packages/plotnine/ggplot.py:624: PlotnineWarning: Filename: grafico.png\n```\n:::\n\n::: {.cell-output .cell-output-stdout}\n```\nGráfico gerado com sucesso! Arquivo salvo como grafico.png\n```\n:::\n:::\n\n\n![alt](grafico.png)\n\n",
+    "supporting": [
+      "index_files"
+    ],
+    "filters": [],
+    "includes": {}
+  }
+}

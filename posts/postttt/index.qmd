@@ -1,0 +1,42 @@
+---
+title: "gráfico X e Y"
+author: "Murilo Moraes"
+date: "2025-11-24"
+categories: [programation, queronota10]
+image: "10993494.jpg"
+jupyter: python3
+---
+
+neste exercicio está como desenvolver um codigo em python que consulta um grafico com multiplos pontos x e y,a explicação está ao logno do codigo nos comentários dele.
+
+```{python}
+from plotnine import ggplot, aes, geom_point, geom_abline
+import pandas as pd
+import numpy as np
+
+# ---- Leitura dos arquivos ----
+with open("X.txt") as f:
+    valores_x = [float(line.strip()) for line in f]
+
+with open("Y.txt") as f:
+    valores_y = [float(line.strip()) for line in f]
+
+df = pd.DataFrame({"x": valores_x, "y": valores_y})
+
+# ---- Regressão linear ----
+b, a = np.polyfit(df['x'], df['y'], 1)
+
+# ---- Geração do gráfico ----
+plot = (
+    ggplot(df, aes("x", "y"))
+    + geom_point()
+    + geom_abline(intercept=a, slope=b)
+)
+
+# ---- Salvar corretamente ----
+plot.save("grafico.png", dpi=300, width=6, height=4)
+
+print("Gráfico gerado com sucesso! Arquivo salvo como grafico.png")
+```
+
+![alt](grafico.png)
